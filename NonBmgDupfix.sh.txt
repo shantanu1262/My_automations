@@ -16,9 +16,9 @@
 #!/bin/bash
 script_path="/prod/qic/support/NonBmg_DupFix"
 DBI_SUPP_USER="qicsupp"
-DBI_SUPP_PASS="6e1KjLfKF7!" 
+DBI_SUPP_PASS="" 
 DBI_OP_USER="qicop"
-DBI_OP_PASS="wV6Q#68Mfkr"
+DBI_OP_PASS=""
 DBI_DNS="QIC"
 LOGFILE="/prod/qic/support/NonBmg_DupFix/log/NonBmg.log"
 OUTPUT_FILE=/prod/qic/support/NonBmg_DupFix/nonbmg_dupfix.lst
