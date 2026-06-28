@@ -1,0 +1,81 @@
+#################################################################################################################################
+# Name             : OldFileCleanup.sh
+# Purpose          : Remove  old files on ARMS server
+# Developer        : Shantanu Pal
+# Create Date      : 23-Sep-2023
+# History
+#   Date               Who               Why                                                   				Version
+#################################################################################################################################
+# 16-Sep-23         Shantanu Pal         Initial                                                            1.0
+# 
+# 
+# 
+#################################################################################################################################
+
+
+#!/bin/bash
+
+# Directory to search for files
+
+directory1="/prod/arms/log"
+directory2="/prod/arms/log/rjs"
+directory3="/prod/arms/data/oac"
+directory4="/prod/arms/rpt"
+
+
+# Number of days to consider files as old
+
+days_threshold=30
+
+# Temporary file to store deleted file names
+
+deleted_files="/tmp/deleted_files.txt"
+
+#-------------------------------------------------------------------------------------------
+# Find files older than specified number of days and delete them
+
+#In /prod/arms/log directory
+
+echo "In /prod/arms/log directory" > "$deleted_files"
+find "$directory1" -type f \(-name "arl9100_LATIS*" -o -name "cleanupPGP_Files*" -o -name "or_daily*" -o -name "arppostb*" -o -name "arpposta*" -o -name "arpdcash*" -o -name "ARMSMain*" -o -name "arl9*" -o -name "arl3*" \)-mtime +$days_threshold -print -delete > "$deleted_files"
+
+#In prod/arms/log/rjs directory
+
+echo "In prod/arms/log/rjs directory" > "$deleted_files"
+find "$directory2" -type f -mtime +$days_threshold -print -delete > "$deleted_files"
+ 
+
+#In /prod/arms/data/oac directory
+
+echo "In /prod/arms/data/oac directory" > "$deleted_files"
+find "$directory3" -type f -mtime +$days_threshold -print -delete > "$deleted_files"
+
+
+#In /prod/arms/rpt directory ,take out everything older than 5 days.
+
+echo "In /prod/arms/rpt directory" > "$deleted_files"
+find "$directory4" -type f -mtime +5 -print -delete > "$deleted_files"
+
+#-------------------------------------------------------------------------------------------
+
+# Count the number of deleted files
+
+deleted_count=$(wc -l < "$deleted_files")
+
+# Send email with deleted file names and count
+
+subject="ARMS Filesystem Cleanup Report"
+
+recipient="oicpsup@CenturyLink.com"
+
+body="The following files were deleted:
+		$(cat "$deleted_files")
+
+Total deleted files: $deleted_count"
+
+echo "$body" | mail -s "$subject" "$recipient"
+
+# Remove the temporary file
+rm "$deleted_files"
+
+
