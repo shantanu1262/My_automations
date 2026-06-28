@@ -1,0 +1,112 @@
+set serveroutput on;
+set echo off;
+set timing on;
+set define off;
+
+SPOOL nonbmg_dupfix.lst APPEND;
+
+DECLARE 
+  V_CREATED_TABLE_NAME VARCHAR2(30); 
+  V_MONTH_VAL VARCHAR2(2);
+  V_BILLING_MONTH_DT VARCHAR2(10);
+  V_SQL_INSERT_STATEMENT VARCHAR2(5000); 
+  V_SQL_DELETE_STATEMENT VARCHAR2(5000);
+  v_cnt NUMBER:=0;  
+  
+BEGIN
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'MONYY')
+  INTO V_CREATED_TABLE_NAME
+  FROM DUAL;
+
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'MM')
+  INTO V_MONTH_VAL
+  FROM DUAL;
+
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'DDmonyy')
+  INTO V_BILLING_MONTH_DT
+  FROM DUAL;
+
+  --Backup dup records into qic_crts_acct_qbl_sync_dupbkp table from qic_crts_acct_qbl_sync table 
+  
+  
+  V_SQL_INSERT_STATEMENT := 'Insert into qicsupp.qic_crts_acct_qbl_sync_dupbkp
+                             SELECT qic_crts_acct_qbl_sync.* , sysdate
+                             FROM qic_crts_acct_qbl_sync 
+                             WHERE (MONTH_VAL, BILLING_MONTH_DT, CRTS_CUSTOMER_ACCT_ID, CRTS_SOURCE_SYSTEM_CD, CRTS_CUST_SEG_CD, QIC_CUSTOMER_ACCT_ID, QIC_SOURCE_SYSTEM_CD, QIC_CUST_SEG_CD, CREATION_DT, SCRIPT_SRC)
+                             IN (
+                                   SELECT qc.MONTH_VAL, qc.BILLING_MONTH_DT, qc.CRTS_CUSTOMER_ACCT_ID, qc.CRTS_SOURCE_SYSTEM_CD, qc.CRTS_CUST_SEG_CD, qc.QIC_CUSTOMER_ACCT_ID, qc.QIC_SOURCE_SYSTEM_CD, qc.QIC_CUST_SEG_CD, qc.CREATION_DT, qc.SCRIPT_SRC
+                                   FROM qic_crts_acct_qbl_sync qc,
+                                (
+                                     SELECT COUNT(*), qic_customer_acct_id, qic_source_system_cd
+                                     FROM qicsupp.SYNC_' || V_CREATED_TABLE_NAME || ' p
+                                     GROUP BY p.qic_customer_acct_id, p.qic_source_system_cd
+                                     HAVING COUNT(p.qic_cust_seg_cd) > 1
+                                ) r
+                               WHERE qc.qic_customer_acct_id = r.qic_customer_acct_id
+                               AND qc.qic_source_system_cd = r.qic_source_system_cd
+                               AND qc.billing_month_dt = ''' || V_BILLING_MONTH_DT || '''
+                               AND qc.month_val = ''' || V_MONTH_VAL || '''
+                               AND (qc.qic_customer_acct_id, qc.qic_source_system_cd, qc.qic_cust_seg_cd) NOT IN
+                              (
+                                 SELECT qic_customer_acct_id, qic_source_system_cd, MAX(qic_cust_seg_cd) qic_cust_seg_cd
+                                 FROM qicsupp.SYNC_' || V_CREATED_TABLE_NAME || ' p
+                                 GROUP BY p.qic_customer_acct_id, p.qic_source_system_cd
+                                 HAVING COUNT(p.qic_cust_seg_cd) > 1
+                              )
+                               )';
+ -- Execute the Insert SQL statement
+  EXECUTE IMMEDIATE V_SQL_INSERT_STATEMENT;
+  
+  v_cnt:=SQL%ROWCOUNT ;
+  COMMIT ;
+  DBMS_OUTPUT.PUT_LINE('Insert statement completed  successfully. Total number of rows inserted into qic_crts_acct_qbl_sync_dupbkp:- '||v_cnt );
+  
+  
+-----------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+
+--Delete Dup records from qic_crts_acct_qbl_sync table 
+
+
+V_SQL_DELETE_STATEMENT := 'DELETE
+                           FROM qic_crts_acct_qbl_sync
+                           WHERE (MONTH_VAL, BILLING_MONTH_DT, CRTS_CUSTOMER_ACCT_ID, CRTS_SOURCE_SYSTEM_CD, CRTS_CUST_SEG_CD, QIC_CUSTOMER_ACCT_ID, QIC_SOURCE_SYSTEM_CD, QIC_CUST_SEG_CD, CREATION_DT, SCRIPT_SRC)
+                           IN (
+                             SELECT qc.MONTH_VAL, qc.BILLING_MONTH_DT, qc.CRTS_CUSTOMER_ACCT_ID, qc.CRTS_SOURCE_SYSTEM_CD, qc.CRTS_CUST_SEG_CD, qc.QIC_CUSTOMER_ACCT_ID, qc.QIC_SOURCE_SYSTEM_CD, qc.QIC_CUST_SEG_CD, qc.CREATION_DT, qc.SCRIPT_SRC
+                             FROM qic_crts_acct_qbl_sync qc,
+                              (
+                                SELECT COUNT(*), qic_customer_acct_id, qic_source_system_cd
+                                FROM qicsupp.SYNC_' || V_CREATED_TABLE_NAME || ' p
+                                GROUP BY p.qic_customer_acct_id, p.qic_source_system_cd
+                                HAVING COUNT(p.qic_cust_seg_cd) > 1
+                              ) r
+                            WHERE qc.qic_customer_acct_id = r.qic_customer_acct_id
+                            AND qc.qic_source_system_cd = r.qic_source_system_cd
+                            AND qc.billing_month_dt = ''' || V_BILLING_MONTH_DT || '''
+                            AND qc.month_val = ''' || V_MONTH_VAL || '''
+                            AND (qc.qic_customer_acct_id, qc.qic_source_system_cd, qc.qic_cust_seg_cd) NOT IN
+                            (
+                              SELECT qic_customer_acct_id, qic_source_system_cd, MAX(qic_cust_seg_cd) qic_cust_seg_cd
+                              FROM qicsupp.SYNC_' || V_CREATED_TABLE_NAME || ' p
+                              GROUP BY p.qic_customer_acct_id, p.qic_source_system_cd
+                              HAVING COUNT(p.qic_cust_seg_cd) > 1
+                            )
+                             )';
+
+  -- Execute the Delete SQL statement
+  EXECUTE IMMEDIATE V_SQL_DELETE_STATEMENT ;
+  
+  v_cnt:=SQL%ROWCOUNT ;
+  COMMIT;
+ DBMS_OUTPUT.PUT_LINE('delete  statement completed   successfully. Total number of rows deleted in qic_crts_acct_qbl_sync:- '||v_cnt);
+  
+  
+EXCEPTION
+    WHEN OTHERS THEN
+    ROLLBACK ;
+    DBMS_OUTPUT.PUT_LINE('Error:- '|| SQLERRM||' : '||SQLCODE);
+ 
+END;
+/
+                    
+SPOOL OFF;

@@ -1,0 +1,51 @@
+SET SERVEROUTPUT ON
+
+DECLARE 
+  V_CREATED_TABLE_NAME VARCHAR2(30); 
+  V_MONTH_VAL VARCHAR2(2);
+  V_BILLING_MONTH_DT VARCHAR2(10);
+  V_SQL_CREATE_STATEMENT VARCHAR2(1000); 
+  v_cnt NUMBER:=0;
+  
+BEGIN
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'MONYY')
+  INTO V_CREATED_TABLE_NAME
+  FROM DUAL;
+
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'MM')
+  INTO V_MONTH_VAL
+  FROM DUAL;
+
+  SELECT TO_CHAR(TRUNC(SYSDATE, 'MM') - INTERVAL '1' MONTH, 'DDmonyy')
+  INTO V_BILLING_MONTH_DT
+  FROM DUAL;
+
+  --  create table and insert data from qic_crts_acct_qbl_sync table 
+  
+  V_SQL_CREATE_STATEMENT := 'CREATE TABLE sync_' || V_CREATED_TABLE_NAME || '
+                      AS	
+                    ( select qic_customer_acct_id, qic_source_system_cd,qic_cust_seg_cd, count(*) as count	
+                      from qic_crts_acct_qbl_sync	
+                      where billing_month_dt = ''' || V_BILLING_MONTH_DT || '''	
+                      and month_val=''' || V_MONTH_VAL || '''	
+                      group by qic_customer_acct_id, qic_source_system_cd,qic_cust_seg_cd
+                    )';
+
+  -- Execute the Create SQL statement
+  EXECUTE IMMEDIATE V_SQL_CREATE_STATEMENT;
+  
+  v_cnt:=SQL%ROWCOUNT ;
+  
+  DBMS_OUTPUT.PUT_LINE('Table created successfully . Total numner of rows inserted :- '||v_cnt );
+  
+  
+  grant all on sync_' || V_CREATED_TABLE_NAME || ' to QICOP;
+  
+  
+  DBMS_OUTPUT.PUT_LINE('Granted all permission to QICOP );
+  
+
+END;
+/
+
+

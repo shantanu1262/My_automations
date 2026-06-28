@@ -1,0 +1,60 @@
+#################################################################################################################################
+# Name             : NonBmgDupfix.sh
+# Purpose          : Peform the DML AND DDL OPERATION IN DUP FIX 
+# Developer        : Shantanu Pal
+# Create Date      : 16-Mar-2024
+# Called Procedures: None
+# Called Functions : None
+# History
+#   Date               Who               Why                                                   				Version
+#################################################################################################################################
+# 16-mar-24         Shantanu Pal         Initial                                                            1.0
+# 
+# 
+# 
+#################################################################################################################################
+#!/bin/bash
+script_path="/prod/qic/support/NonBmg_DupFix"
+DBI_SUPP_USER="qicsupp"
+DBI_SUPP_PASS="6e1KjLfKF7!" 
+DBI_OP_USER="qicop"
+DBI_OP_PASS="wV6Q#68Mfkr"
+DBI_DNS="QIC"
+LOGFILE="/prod/qic/support/NonBmg_DupFix/log/NonBmg.log"
+OUTPUT_FILE=/prod/qic/support/NonBmg_DupFix/nonbmg_dupfix.lst
+var_1=`date "+%m%d%Y_%H_%M_%S"`
+#mailing disto
+email="oicpsup@CenturyLink.com"
+
+
+echo "\n NonBmg Dupfix script started at $(date "+%d-%b-%Y_%H:%M") " > "$LOGFILE"
+
+#Run 1st PLSQL query in QICSUPP
+
+sqlplus $DBI_SUPP_USER/$DBI_SUPP_PASS@$DBI_DNS @DupFixFirstquery.sql ;
+echo " NonBmg First query completed successfully "
+
+#RUN 2nd PLSQL query in QICOP
+
+sqlplus $DBI_OP_USER/$DBI_OP_PASS@$DBI_DNS @DupFixSecondquery.sql 
+echo " NonBmg second query completed successfully "
+
+#Check for the ORA error inside the nonbmg_dupfix file.
+
+if test `grep -i ora- nonbmg_dupfix.lst| wc -l` -eq 0
+then
+    echo -e "\n NonBmg Dup Fix completed Successfully at $(date "+%d-%b-%Y_%H:%M") " >> "$LOGFILE"
+    echo -e "\n Contents of nonbmg_dupfix.lst:" >> "$LOGFILE"
+    cat nonbmg_dupfix.lst >> "$LOGFILE"
+    mail -s "NonBmgDupFix Script completed successfully" "$email" < "$LOGFILE"
+else
+    echo -e "\n NonBmg Dup Fix  Failed at $(date "+%d-%b-%Y_%H:%M"). Please check for errors in attachment." >> "$LOGFILE"
+    echo -e "\n Contents of nonbmg_dupfix.lst:" >> "$LOGFILE"
+    cat nonbmg_dupfix.lst >> "$LOGFILE"
+    mail -s "NonBmgDupFix Script Failed " "$email" < "$LOGFILE"
+fi
+
+#Copy .lst files to log directory
+cp -p /prod/qic/support/NonBmg_DupFix/nonbmg_dupfix.lst /prod/qic/support/NonBmg_DupFix/log/nonbmg_dupfix_${var_1}.lst 
+
+rm nonbmg_dupfix.lst
